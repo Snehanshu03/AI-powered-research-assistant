@@ -6,9 +6,16 @@ from .pdf_parser import extract_text_from_pdf
 from .chunker import chunk_text
 from .embeddings import generate_embeddings
 from .vector_store import store_embeddings
+from .vector_store import search_similar_chunks
+from .llm import generate_answer
+from .vector_store import reset_collection
+from pydantic import BaseModel
 
 
 
+
+
+last_uploaded_file = None
 app = FastAPI(
     title="AI Powered Research Assistant",
     description="Backend API for reading and querying research papers",
@@ -25,24 +32,65 @@ def root():
 
 
 @app.post("/upload")
-async def upload_pdf(file: UploadFile = File(...)):
-    file_path = os.path.join(UPLOAD_DIR, file.filename)
+def upload_pdf(file: UploadFile = File(...)):
+    global last_uploaded_file
+
+    # 🔥 RESET DATABASE
+    reset_collection()
+
+    file_path = f"uploaded_papers/{file.filename}"
 
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
     extracted_text = extract_text_from_pdf(file_path)
-
     chunks = chunk_text(extracted_text)
-
     embeddings = generate_embeddings(chunks)
 
-    stored_count = store_embeddings(chunks, embeddings)
+    store_embeddings(chunks, embeddings, file.filename)
+
+    last_uploaded_file = file.filename
+
+    return {"message": "PDF processed successfully"}
+
+
+class AskRequest(BaseModel):
+    query: str
+    history: list = []
+
+
+@app.post("/ask")
+def ask(request: AskRequest):
+    global last_uploaded_file
+
+    if not last_uploaded_file:
+        return {"answer": "Please upload a PDF first.", "sources": []}
+
+    query = request.query
+    history = request.history[-6:]   # 🔥 limit memory
+
+    query_embedding = generate_embeddings([query])[0]
+
+    results = search_similar_chunks(query_embedding, last_uploaded_file)
+
+    context = "\n\n".join([r["text"] for r in results])
+
+    history_text = ""
+    for msg in history:
+        role = "User" if msg["role"] == "user" else "Assistant"
+        history_text += f"{role}: {msg['content']}\n"
+
+    full_context = f"""
+Conversation:
+{history_text}
+
+Context:
+{context}
+"""
+
+    answer = generate_answer(query, full_context)
 
     return {
-        "filename": file.filename,
-        "characters_extracted": len(extracted_text),
-        "number_of_chunks": len(chunks),
-        "stored_in_vector_db": stored_count
+        "answer": answer,
+        "sources": [r["text"][:150] for r in results]
     }
-

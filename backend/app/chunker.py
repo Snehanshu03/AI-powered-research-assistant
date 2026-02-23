@@ -1,5 +1,4 @@
-def chunk_text(text: str, chunk_size: int = 500, overlap: int = 100):
-    """
+"""
     Splits text into overlapping chunks.
     
     Args:
@@ -10,7 +9,7 @@ def chunk_text(text: str, chunk_size: int = 500, overlap: int = 100):
     Returns:
         List[str]: List of text chunks
     """
-
+def chunk_text(text: str, chunk_size=500, overlap=100):
     words = text.split()
     chunks = []
 
@@ -18,7 +17,12 @@ def chunk_text(text: str, chunk_size: int = 500, overlap: int = 100):
     while start < len(words):
         end = start + chunk_size
         chunk = " ".join(words[start:end])
-        chunks.append(chunk)
+
+        # 🔥 FILTER BAD CHUNKS
+        if len(chunk) > 100:
+            if "et al" not in chunk.lower():
+                if "arxiv" not in chunk.lower():
+                    chunks.append(chunk)
 
         start += chunk_size - overlap
 
