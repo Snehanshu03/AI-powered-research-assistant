@@ -9,21 +9,22 @@
     Returns:
         List[str]: List of text chunks
     """
-def chunk_text(text: str, chunk_size=500, overlap=100):
-    words = text.split()
+def chunk_text(pages, chunk_size=500, overlap=100):
     chunks = []
 
-    start = 0
-    while start < len(words):
-        end = start + chunk_size
-        chunk = " ".join(words[start:end])
+    for page_data in pages:
+        page_num = page_data["page"]
+        words = page_data["text"].split()
 
-        # 🔥 FILTER BAD CHUNKS
-        if len(chunk) > 100:
-            if "et al" not in chunk.lower():
-                if "arxiv" not in chunk.lower():
-                    chunks.append(chunk)
+        start = 0
+        while start < len(words):
+            chunk = " ".join(words[start:start+chunk_size])
 
-        start += chunk_size - overlap
+            chunks.append({
+                "text": chunk,
+                "page": page_num   # 🔥 STORE PAGE
+            })
+
+            start += chunk_size - overlap
 
     return chunks

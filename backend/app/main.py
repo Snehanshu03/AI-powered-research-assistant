@@ -1,16 +1,16 @@
 from fastapi import FastAPI, UploadFile, File
 import shutil
 import os
-
+from fastapi.responses import StreamingResponse
 from .pdf_parser import extract_text_from_pdf
 from .chunker import chunk_text
 from .embeddings import generate_embeddings
 from .vector_store import store_embeddings
 from .vector_store import search_similar_chunks
-from .llm import generate_answer
+from .llm import generate_answer, generate_answer_stream
 from .vector_store import reset_collection
 from pydantic import BaseModel
-
+from .pdf_parser import extract_text_with_pages
 
 
 
@@ -43,8 +43,8 @@ def upload_pdf(file: UploadFile = File(...)):
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    extracted_text = extract_text_from_pdf(file_path)
-    chunks = chunk_text(extracted_text)
+    pages = extract_text_with_pages(file_path)
+    chunks = chunk_text(pages)
     embeddings = generate_embeddings(chunks)
 
     store_embeddings(chunks, embeddings, file.filename)
@@ -59,18 +59,31 @@ class AskRequest(BaseModel):
     history: list = []
 
 
-@app.post("/ask")
-def ask(request: AskRequest):
-    global last_uploaded_file
 
-    if not last_uploaded_file:
-        return {"answer": "Please upload a PDF first.", "sources": []}
+@app.post("/ask-stream")
+def ask_stream(request: AskRequest):
 
     query = request.query
-    history = request.history[-6:]   # 🔥 limit memory
+    history = request.history
 
     query_embedding = generate_embeddings([query])[0]
+    results = search_similar_chunks(query_embedding, last_uploaded_file)
 
+    context = "\n\n".join([r["text"] for r in results])
+
+    def stream_generator():
+        for token in generate_answer_stream(query, context):
+            yield token
+
+    return StreamingResponse(stream_generator(), media_type="text/plain")
+
+
+@app.post("/ask")
+def ask(request: AskRequest):
+    query = request.query
+    history = request.history
+
+    query_embedding = generate_embeddings([query])[0]
     results = search_similar_chunks(query_embedding, last_uploaded_file)
 
     context = "\n\n".join([r["text"] for r in results])
@@ -91,6 +104,14 @@ Context:
     answer = generate_answer(query, full_context)
 
     return {
-        "answer": answer,
-        "sources": [r["text"][:150] for r in results]
-    }
+    "answer": answer,
+    "sources": [
+        {
+            "text": r["text"][:300],
+            "page": r["page"]
+        }
+        for r in results
+    ]
+}
+
+

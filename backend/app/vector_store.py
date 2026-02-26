@@ -9,41 +9,36 @@ collection = client.get_or_create_collection(
 
 
 def store_embeddings(chunks, embeddings, filename):
-    print("🔥 Storing embeddings in ChromaDB...")
-
-    for i, chunk in enumerate(chunks):
-        collection.add(
-            documents=[chunk],
-            embeddings=[embeddings[i].tolist()],
-            ids=[f"{filename}_chunk_{i}"],
-            metadatas=[{"source": filename}]
-        )
-
-    return len(chunks)
-
-
-
-def search_similar_chunks(query_embedding, filename, top_k=3):
-    results = collection.query(
-        query_embeddings=[query_embedding.tolist()],
-        n_results=top_k,
-        where={"source": filename}   # 🔥 IMPORTANT
+    collection.add(
+        embeddings=[e.tolist() for e in embeddings],
+        documents=[c["text"] for c in chunks],
+        metadatas=[
+            {
+                "source": filename,
+                "page": c["page"]   # 🔥 ADD PAGE
+            }
+            for c in chunks
+        ],
+        ids=[str(i) for i in range(len(chunks))]
     )
 
-    documents = results["documents"][0]
-    ids = results["ids"][0]
 
-    cleaned = []
-    for i, doc in enumerate(documents):
-        doc = doc.replace("<pad>", "").strip()
 
-        if len(doc) > 50:
-            cleaned.append({
-                "id": ids[i],
-                "text": doc
-            })
+def search_similar_chunks(query_embedding, filename):
+    results = collection.query(
+    query_embeddings=[query_embedding.tolist()],
+    n_results=3,
+    where={"source": filename}  # 🔥 IMPORTANT
+)
 
-    return cleaned
+    output = []
+    for i in range(len(results["documents"][0])):
+        output.append({
+            "text": results["documents"][0][i],
+            "page": results["metadatas"][0][i]["page"]
+        })
+
+    return output
 
 
 

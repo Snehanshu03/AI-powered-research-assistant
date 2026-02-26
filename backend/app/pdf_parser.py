@@ -26,3 +26,16 @@ def extract_text_from_pdf(file_path: str) -> str:
         text += page.get_text()
 
     return clean_text(text)
+
+def extract_text_with_pages(pdf_path):
+    doc = fitz.open(pdf_path)
+    pages = []
+
+    for i, page in enumerate(doc):
+        text = page.get_text()
+        pages.append({
+            "page": i + 1,
+            "text": text
+        })
+
+    return pages

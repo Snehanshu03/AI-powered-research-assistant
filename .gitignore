@@ -218,3 +218,5 @@ uploaded_papers/
 # Python cache
 __pycache__/
 *.pyc
+
+.env

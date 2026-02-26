@@ -1,23 +1,37 @@
-import requests
+from groq import Groq
+import os
+from dotenv import load_dotenv
+import os
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "phi3"
+load_dotenv()  # 🔥 this loads .env
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))  # 🔥 replace this
+
+def generate_answer_stream(query, context):
+    stream = client.chat.completions.create(
+        model="llama-3.1-8b-instant",
+        messages=[
+            {"role": "system", "content": "You are a helpful research assistant."},
+            {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {query}"}
+        ],
+        stream=True  # 🔥 IMPORTANT
+    )
+
+    for chunk in stream:
+        if chunk.choices[0].delta.content:
+            yield chunk.choices[0].delta.content
+
 
 
 def generate_answer(query: str, context: str):
+
     prompt = f"""
 You are an expert AI research assistant.
 
-Use BOTH:
-1. Conversation history
-2. Context from the paper
-
-to answer the question.
-
-If the question refers to previous messages, use the conversation.
-
-If answer not found, say:
-"Not found in the paper."
+STRICT RULES:
+- Answer ONLY using the provided context
+- Do NOT hallucinate
+- If answer not found, say "Not found in the paper"
+- Be clear and structured
 
 Context:
 {context}
@@ -29,25 +43,17 @@ Answer:
 """
 
     try:
-        response = requests.post(
-            OLLAMA_URL,
-            json={
-                "model": MODEL,
-                "prompt": prompt,
-                "stream": False
-            }
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",  # 🔥 fast + good
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.2
         )
 
-        data = response.json()
-        print("DEBUG RESPONSE:", data)
-
-        # 🔥 safer extraction
-        if "response" in data:
-            return data["response"].strip()
-        elif "error" in data:
-            return f"LLM Error: {data['error']}"
-        else:
-            return "Unexpected response from LLM"
+        return response.choices[0].message.content
 
     except Exception as e:
-        return f"Error connecting to LLM: {str(e)}"
+        return f"LLM Error: {str(e)}"
+    
+
