@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 4, "column": 0}, "map": {"version":3,"sources":["file:///D:/AI-powered-research-assistant/frontend/app/layout.tsx"],"sourcesContent":["import \"./globals.css\";\n\nexport const metadata = {\n  title: \"AI Research Assistant\",\n  description: \"Chat with research papers\",\n};\n\nexport default function RootLayout({\n  children,\n}: {\n  children: React.ReactNode;\n}) {\n  return (\n    <html lang=\"en\" className=\"dark\">\n      <body className=\"font-sans\">{children}</body>\n    </html>\n  );\n}"],"names":[],"mappings":";;;;;;;;;AAEO,MAAM,WAAW;IACtB,OAAO;IACP,aAAa;AACf;AAEe,SAAS,WAAW,EACjC,QAAQ,EAGT;IACC,qBACE,0PAAC;QAAK,MAAK;QAAK,WAAU;kBACxB,cAAA,0PAAC;YAAK,WAAU;sBAAa;;;;;;;;;;;AAGnC"}},
+    {"offset": {"line": 39, "column": 0}, "map": {"version":3,"sources":["file:///D:/AI-powered-research-assistant/frontend/node_modules/next/src/server/route-modules/app-page/vendored/rsc/react-jsx-dev-runtime.ts"],"sourcesContent":["module.exports = (\n  require('../../module.compiled') as typeof import('../../module.compiled')\n).vendored['react-rsc']!.ReactJsxDevRuntime\n"],"names":["module","exports","require","vendored","ReactJsxDevRuntime"],"mappings":"AAAAA,OAAOC,OAAO,GACZC,QAAQ,qIACRC,QAAQ,CAAC,YAAY,CAAEC,kBAAkB","ignoreList":[0]}}]
+}
