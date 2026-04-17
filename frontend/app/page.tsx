@@ -16,6 +16,7 @@ export default function Home() {
   const [page, setPage] = useState(1);
   const [highlight, setHighlight] = useState("");
   const [summary, setSummary] = useState("");
+  
 
   return (
     <div className="flex h-screen w-screen overflow-hidden">

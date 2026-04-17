@@ -2,7 +2,7 @@
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface Source {
   text: string;
@@ -14,7 +14,19 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   sources?: Source[];
+  suggestions?: string[];
 }
+
+// ✅ Helper creators (clean typing)
+const createUserMessage = (content: string): Message => ({
+  role: "user",
+  content,
+});
+
+const createAssistantMessage = (content: string): Message => ({
+  role: "assistant",
+  content,
+});
 
 export default function ChatPanel({
   setPage,
@@ -27,85 +39,53 @@ export default function ChatPanel({
   selectedFile?: string | null;
   summary?: string;
 }) {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [chatHistory, setChatHistory] = useState<Record<string, Message[]>>({});
   const [input, setInput] = useState("");
   const [searchMode, setSearchMode] = useState<"current" | "all">("current");
   const [loading, setLoading] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
 
-  // =============================
-  // EXPLAIN TEXT 🔥
-  // =============================
-  const explainText = async (text: string) => {
-    setLoading(true);
+  const messages = selectedFile ? chatHistory[selectedFile] || [] : [];
 
-    const userMessage = {
-      role: "user" as const,
-      content: `Explain this:\n\n${text.slice(0, 200)}...`,
-    };
-
-    const aiMessage: Message = {
-      role: "assistant",
-      content: "",
-    };
-
-    setMessages((prev) => [...prev, userMessage, aiMessage]);
-
-    try {
-      const res = await fetch("http://localhost:8000/explain", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ text }),
-      });
-
-      const data = await res.json();
-
-      setMessages((prev) => {
-        const updated = [...prev];
-        updated[updated.length - 1] = {
-          role: "assistant",
-          content: data.answer,
-        };
-        return updated;
-      });
-
-    } catch (err) {
-      console.error("Explain error:", err);
-    } finally {
-      setLoading(false);
-    }
+  const updateMessages = (newMessages: Message[]) => {
+    if (!selectedFile) return;
+    setChatHistory((prev) => ({
+      ...prev,
+      [selectedFile]: newMessages,
+    }));
   };
 
   // =============================
   // SEND MESSAGE
   // =============================
-  const sendMessage = async () => {
-    if (!input.trim()) return;
+  const sendMessage = async (customQuery?: string) => {
+    const queryText = customQuery || input;
+
+    if (!queryText.trim()) return;
 
     if (searchMode === "current" && !selectedFile) {
       alert("Please select a paper first");
       return;
     }
 
-    const userMessage = { role: "user" as const, content: input };
+    const userMessage = createUserMessage(queryText);
     const newMessages = [...messages, userMessage];
 
-    setMessages(newMessages);
+    updateMessages(newMessages);
     setInput("");
     setLoading(true);
 
-    const aiMessage: Message = { role: "assistant", content: "" };
-    setMessages((prev) => [...prev, aiMessage]);
+    // placeholder assistant message
+    updateMessages([...newMessages, createAssistantMessage("")]);
 
     const payload = {
-      query: input,
+      query: queryText,
       history: newMessages,
       filename: searchMode === "current" ? selectedFile : null,
     };
 
     try {
+      // 🔹 STREAMING RESPONSE
       const response = await fetch("http://localhost:8000/ask-stream", {
         method: "POST",
         headers: {
@@ -126,16 +106,13 @@ export default function ChatPanel({
 
         fullText += decoder.decode(value);
 
-        setMessages((prev) => {
-          const updated = [...prev];
-          updated[updated.length - 1] = {
-            role: "assistant",
-            content: fullText,
-          };
-          return updated;
-        });
+        updateMessages([
+          ...newMessages,
+          createAssistantMessage(fullText),
+        ]);
       }
 
+      // 🔹 FETCH SOURCES + SUGGESTIONS
       const sourceResponse = await fetch("http://localhost:8000/ask", {
         method: "POST",
         headers: {
@@ -147,17 +124,16 @@ export default function ChatPanel({
       if (sourceResponse.ok) {
         const data = await sourceResponse.json();
 
-        setMessages((prev) => {
-          const updated = [...prev];
-          updated[updated.length - 1] = {
+        updateMessages([
+          ...newMessages,
+          {
             role: "assistant",
             content: fullText,
             sources: data.sources,
-          };
-          return updated;
-        });
+            suggestions: data.suggestions,
+          },
+        ]);
       }
-
     } catch (err) {
       console.error("Chat error:", err);
     } finally {
@@ -165,11 +141,18 @@ export default function ChatPanel({
     }
   };
 
+  // =============================
+  // RESET INPUT ON FILE CHANGE
+  // =============================
+  useEffect(() => {
+    setInput("");
+  }, [selectedFile]);
+
   return (
     <aside className="w-96 bg-[#1a212e] border-l border-[#282e39] p-4 flex flex-col h-full">
 
       {/* HEADER */}
-      <div className="mb-2 flex justify-between items-center text-xs text-gray-400">
+      <div className="mb-2 flex justify-between text-xs text-gray-400">
         <span>{selectedFile || "No paper selected"}</span>
 
         {summary && (
@@ -210,15 +193,13 @@ export default function ChatPanel({
 
       {/* CHAT */}
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
-
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-
             <div
               className={`p-3 rounded-lg max-w-xs ${
                 msg.role === "user"
                   ? "bg-cyan-600"
-                  : "bg-[#102022] border border-[#282e39] prose prose-invert max-w-none text-sm"
+                  : "bg-[#102022] border border-[#282e39] prose prose-invert text-sm"
               }`}
             >
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -226,13 +207,12 @@ export default function ChatPanel({
               </ReactMarkdown>
 
               {/* SOURCES */}
-              {msg.role === "assistant" && msg.sources && (
+              {msg.sources && (
                 <div className="mt-3 space-y-2">
                   <div className="text-xs text-gray-400">Sources</div>
 
                   {msg.sources.map((src, idx) => (
-                    <div key={idx} className="p-2 border border-[#282e39] rounded text-xs">
-
+                    <div key={idx} className="text-xs border p-2 rounded">
                       <div
                         onClick={() => {
                           setPage(src.page);
@@ -244,20 +224,30 @@ export default function ChatPanel({
                         <div className="text-gray-400">Page {src.page}</div>
                         <div className="text-gray-500 line-clamp-2">{src.text}</div>
                       </div>
-
-                      <button
-                        onClick={() => explainText(src.text)}
-                        className="mt-2 text-cyan-400 text-xs hover:underline"
-                      >
-                        Explain this
-                      </button>
-
                     </div>
                   ))}
                 </div>
               )}
-            </div>
 
+              {/* 🔥 SUGGESTIONS */}
+              {msg.suggestions && msg.suggestions.length > 0 && (
+                <div className="mt-3 space-y-1">
+                  <div className="text-xs text-gray-400">
+                    Suggested Questions
+                  </div>
+
+                  {msg.suggestions.map((q, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => sendMessage(q)}
+                      className="block text-left text-xs text-cyan-400 hover:underline"
+                    >
+                      • {q}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         ))}
 
@@ -275,45 +265,30 @@ export default function ChatPanel({
         />
 
         <button
-          onClick={sendMessage}
+          onClick={() => sendMessage()}
           className="bg-cyan-500 px-4 rounded hover:bg-cyan-600"
         >
           Send
         </button>
       </div>
 
-      {/* =============================
-          SUMMARY DRAWER 🔥
-      ============================= */}
+      {/* SUMMARY DRAWER */}
       {showSummary && (
         <div className="fixed inset-0 z-50 flex">
-
-          <div
-            className="flex-1 bg-black/40"
-            onClick={() => setShowSummary(false)}
-          />
+          <div className="flex-1 bg-black/40" onClick={() => setShowSummary(false)} />
 
           <div className="w-96 bg-[#1a212e] border-l border-[#282e39] p-4 flex flex-col">
-
-            <div className="flex justify-between items-center mb-3">
+            <div className="flex justify-between mb-3">
               <h2 className="text-cyan-400 text-sm">Paper Summary</h2>
-
-              <button
-                onClick={() => setShowSummary(false)}
-                className="text-gray-400 hover:text-white"
-              >
-                ✕
-              </button>
+              <button onClick={() => setShowSummary(false)}>✕</button>
             </div>
 
             <div className="flex-1 overflow-y-auto text-sm text-gray-300 whitespace-pre-line">
               {summary}
             </div>
-
           </div>
         </div>
       )}
-
     </aside>
   );
 }

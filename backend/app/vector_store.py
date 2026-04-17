@@ -24,22 +24,38 @@ def store_embeddings(chunks, embeddings, filename):
 
 
 
-def search_similar_chunks(query_embedding, filename):
-    results = collection.query(
-    query_embeddings=[query_embedding.tolist()],
-    n_results=3,
-    where={"source": filename}  # 🔥 IMPORTANT
-)
+def search_similar_chunks(query_embedding, filename=None):
 
-    output = []
-    for i in range(len(results["documents"][0])):
-        output.append({
-            "text": results["documents"][0][i],
-            "page": results["metadatas"][0][i]["page"]
-        })
+    try:
+        if filename:
+            results = collection.query(
+                query_embeddings=[query_embedding.tolist()],
+                n_results=5,
+                where={"filename": filename}
+            )
+        else:
+            results = collection.query(
+                query_embeddings=[query_embedding.tolist()],
+                n_results=5
+            )
 
-    return output
+        output = []
 
+        if not results or not results.get("documents"):
+            return []
+
+        for i in range(len(results["documents"][0])):
+            output.append({
+                "text": results["documents"][0][i],
+                "page": results["metadatas"][0][i]["page"],
+                "filename": results["metadatas"][0][i]["filename"]
+            })
+
+        return output
+
+    except Exception as e:
+        print("Search error:", e)
+        return []
 
 
 
