@@ -9,19 +9,29 @@ collection = client.get_or_create_collection(
 
 
 def store_embeddings(chunks, embeddings, filename):
+    existing = collection.get(where={"filename": filename}, include=[])
+    existing_ids = existing.get("ids", [])
+
+    if existing_ids:
+        collection.delete(where={"filename": filename})
+
     collection.add(
         embeddings=[e.tolist() for e in embeddings],
         documents=[c["text"] for c in chunks],
         metadatas=[
             {
-                "source": filename,
-                "page": c["page"]   # 🔥 ADD PAGE
+                "filename": filename,   # ✅ FIXED
+                "page": c["page"]
             }
             for c in chunks
         ],
-        ids=[str(i) for i in range(len(chunks))]
+        ids=[f"{filename}:{i}" for i in range(len(chunks))]
     )
 
+
+def has_embeddings_for_file(filename):
+    data = collection.get(where={"filename": filename}, include=[])
+    return len(data.get("ids", [])) > 0
 
 
 def search_similar_chunks(query_embedding, filename=None):

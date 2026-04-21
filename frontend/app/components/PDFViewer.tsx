@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { DragEvent, useState, useEffect, useMemo, useRef } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/TextLayer.css";
 import "react-pdf/dist/Page/AnnotationLayer.css";
@@ -19,9 +19,12 @@ export default function PDFViewer({
   const [uploadedPdfUrl, setUploadedPdfUrl] = useState<string | null>(null);
   const [numPages, setNumPages] = useState<number>(0);
   const [loading, setLoading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const viewerRef = useRef<HTMLDivElement>(null);
 
   const pdfUrl = selectedFile
-    ? `http://localhost:8000/uploaded_papers/${selectedFile}`
+    ? `${process.env.NEXT_PUBLIC_API_URL}/uploaded_papers/${selectedFile}`
     : uploadedPdfUrl;
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
@@ -35,23 +38,21 @@ export default function PDFViewer({
     };
   }, []);
 
-  /*
-  =============================
-  SCROLL TO PAGE (AFTER RENDER)
-  =============================
-  */
+  // =============================
+  // 🔥 SMOOTH SCROLL TO PAGE
+  // =============================
   useEffect(() => {
-    if (!page || !pdfUrl) return;
+    if (!page || !pdfUrl || !viewerRef.current) return;
 
     const timer = setTimeout(() => {
-      const element = document.querySelector(
+      const element = viewerRef.current?.querySelector(
         `[data-page-number="${page}"]`
       );
 
-      if (element) {
-        element.scrollIntoView({
+      if (element && viewerRef.current) {
+        viewerRef.current.scrollTo({
+          top: (element as HTMLElement).offsetTop - 20,
           behavior: "smooth",
-          block: "center",
         });
       }
     }, 300);
@@ -59,11 +60,9 @@ export default function PDFViewer({
     return () => clearTimeout(timer);
   }, [page, pdfUrl]);
 
-  /*
-  =============================
-  HIGHLIGHT TEXT (FIXED)
-  =============================
-  */
+  // =============================
+  // 🔥 HIGHLIGHT TEXT
+  // =============================
   useEffect(() => {
     if (!highlight) return;
 
@@ -80,22 +79,22 @@ export default function PDFViewer({
         const text = span.textContent?.toLowerCase() || "";
         const target = highlight.toLowerCase();
 
-        if (text && text.includes(target)) {
+        if (text.includes(target)) {
           (span as HTMLElement).style.background = "yellow";
           (span as HTMLElement).style.borderRadius = "3px";
         }
       });
-    }, 400);
+    }, 500);
 
     return () => clearTimeout(timer);
   }, [page, highlight]);
 
-  /*
-  =============================
-  UPLOAD PDF (IMPROVED)
-  =============================
-  */
+  // =============================
+  // 📤 UPLOAD PDF
+  // =============================
   const uploadPDF = async (file: File) => {
+    if (file.type !== "application/pdf") return;
+
     setLoading(true);
 
     const formData = new FormData();
@@ -106,34 +105,85 @@ export default function PDFViewer({
       body: formData,
     });
 
-    // Refresh sidebar
     window.dispatchEvent(new Event("papersUpdated"));
 
-    // Auto-open uploaded file
     setUploadedPdfUrl(
-      `http://localhost:8000/uploaded_papers/${file.name}`
+      `${process.env.NEXT_PUBLIC_API_URL}/uploaded_papers/${file.name}`
     );
 
     setLoading(false);
   };
 
+  const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (event: DragEvent<HTMLDivElement>) => {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDragging(false);
+
+    const file = event.dataTransfer.files?.[0];
+    if (!file) return;
+
+    uploadPDF(file);
+  };
+
   return (
-    <main className="flex-1 bg-[#1e232e] p-6 flex flex-col">
-      <h2 className="text-xl mb-4 text-white">PDF Viewer</h2>
+    <main
+      className="h-full min-h-0 overflow-hidden bg-[#1e232e] p-6 flex flex-col"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
 
-      {/* Upload */}
-      <input
-        type="file"
-        accept="application/pdf"
-        onChange={(e) => {
-          if (!e.target.files) return;
-          uploadPDF(e.target.files[0]); // ✅ single file for clarity
-        }}
-        className="mb-4 text-white"
-      />
+      {/* HEADER */}
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-xl text-white">PDF Viewer</h2>
 
-      {/* Viewer */}
-      <div className="flex-1 bg-white rounded overflow-auto p-4 flex justify-center">
+        <div className="flex items-center gap-3">
+          <label className="bg-gray-200 px-3 py-1 rounded cursor-pointer text-black text-sm hover:bg-gray-300">
+            Choose File
+            <input
+              type="file"
+              accept="application/pdf"
+              onChange={(e) => {
+                if (!e.target.files) return;
+                uploadPDF(e.target.files[0]);
+              }}
+              className="hidden"
+            />
+          </label>
+
+          <span className="text-sm text-gray-400 max-w-[220px] truncate">
+            {selectedFile ||
+              uploadedPdfUrl?.split("/").pop() ||
+              "No file chosen"}
+          </span>
+        </div>
+      </div>
+
+      {/* VIEWER */}
+      <div
+        ref={viewerRef}
+        className={`relative flex-1 min-h-0 rounded overflow-y-auto p-6 scroll-smooth ${
+          isDragging
+            ? "bg-cyan-50 ring-2 ring-dashed ring-cyan-500"
+            : "bg-white"
+        }`}
+      >
+        {isDragging && (
+          <div className="pointer-events-none absolute inset-4 z-10 flex items-center justify-center rounded border-2 border-dashed border-cyan-500 bg-cyan-50/90 text-center text-sm font-medium text-cyan-700">
+            Drop a PDF here to upload
+          </div>
+        )}
 
         {loading && (
           <div className="text-black">Uploading PDF...</div>
@@ -145,12 +195,18 @@ export default function PDFViewer({
             options={pdfOptions}
             onLoadSuccess={onDocumentLoadSuccess}
           >
-            {Array.from(new Array(numPages), (_, index) => (
-              <div key={index} data-page-number={index + 1}>
+            {Array.from({ length: numPages }, (_, index) => (
+              <div
+                key={index}
+                data-page-number={index + 1}
+                className="flex justify-center mb-6"
+              >
                 <Page
                   pageNumber={index + 1}
                   renderTextLayer
                   renderAnnotationLayer
+                  className="shadow-md"
+                  width={700} // optional but improves readability
                 />
               </div>
             ))}

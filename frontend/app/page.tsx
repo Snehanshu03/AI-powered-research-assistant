@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import Sidebar from "./components/Sidebar";
 import ChatPanel from "./components/ChatPanel";
@@ -16,30 +16,72 @@ export default function Home() {
   const [page, setPage] = useState(1);
   const [highlight, setHighlight] = useState("");
   const [summary, setSummary] = useState("");
-  
+
+  // =============================
+  // 🔥 AUTO SUMMARY FETCH (CLEAN)
+  // =============================
+  useEffect(() => {
+  if (!selectedFile) return;
+
+  let isMounted = true;
+
+  const fetchSummary = async () => {
+    try {
+      const res = await fetch(
+        `http://127.0.0.1:8000/summarize/${encodeURIComponent(selectedFile)}`
+      );
+
+      if (!res.ok) {
+        if (isMounted) setSummary("Failed to load summary");
+        return;
+      }
+
+      const data = await res.json();
+      if (isMounted) setSummary(data.summary);
+
+    } catch (err) {
+      console.error("Summary fetch failed:", err);
+      if (isMounted) setSummary("Error loading summary");
+    }
+  };
+
+  fetchSummary();
+
+  return () => {
+    isMounted = false;
+  };
+}, [selectedFile]);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden">
+    <div className="flex h-screen w-screen bg-[#1e252b] text-white overflow-hidden">
 
+      {/* Sidebar */}
       <Sidebar
         setSelectedFile={setSelectedFile}
         setPage={setPage}
         setHighlight={setHighlight}
-        setSummary={setSummary}
       />
 
-      <PDFViewer
-        page={page}
-        highlight={highlight}
-        selectedFile={selectedFile}
-      />
+      {/* PDF Viewer */}
+      <main className="flex-1 flex flex-col min-w-0 min-h-0 p-6">
+        <div className="bg-white rounded-lg h-full min-h-0 overflow-hidden flex flex-col">
+          <PDFViewer
+            page={page}
+            highlight={highlight}
+            selectedFile={selectedFile}
+          />
+        </div>
+      </main>
 
-      <ChatPanel
-        setPage={setPage}
-        setHighlight={setHighlight}
-        selectedFile={selectedFile}
-        summary={summary}
-      />
+      {/* Right Panel */}
+      <aside className="w-[420px] p-4 flex flex-col bg-[#1e252b] border-l border-[#333e48]">
+        <ChatPanel
+          setPage={setPage}
+          setHighlight={setHighlight}
+          selectedFile={selectedFile}
+          summary={summary}
+        />
+      </aside>
 
     </div>
   );
