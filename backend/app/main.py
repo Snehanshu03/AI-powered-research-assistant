@@ -28,7 +28,7 @@ app = FastAPI(
 )
 
 # =============================
-# CORS (REQUIRED FOR DEPLOY)
+# CORS
 # =============================
 app.add_middleware(
     CORSMiddleware,
@@ -39,7 +39,7 @@ app.add_middleware(
 )
 
 # =============================
-# FILE STORAGE (DEPLOY SAFE)
+# FILE STORAGE
 # =============================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.path.join(BASE_DIR, "..", "uploaded_papers")
@@ -61,7 +61,7 @@ def root():
 
 
 # =============================
-# ENSURE INDEXED (LAZY INDEX)
+# ENSURE INDEXED
 # =============================
 def ensure_file_indexed(filename: str | None):
     if not filename:
@@ -86,7 +86,7 @@ def ensure_file_indexed(filename: str | None):
 
 
 # =============================
-# UPLOAD PDF
+# UPLOAD
 # =============================
 @app.post("/upload")
 def upload_pdf(file: UploadFile = File(...)):
@@ -131,7 +131,6 @@ def ask_stream(request: AskRequest):
 
     context = "\n\n".join([r["text"] for r in results]) if results else ""
 
-    # include history for better answers
     history_text = ""
     for msg in history:
         role = "User" if msg["role"] == "user" else "Assistant"
@@ -169,7 +168,6 @@ def ask(request: AskRequest):
 
     context = "\n\n".join([r["text"] for r in results]) if results else ""
 
-    # build history
     history_text = ""
     for msg in history:
         role = "User" if msg["role"] == "user" else "Assistant"
@@ -259,7 +257,7 @@ def summarize_paper(filename: str):
 
 
 # =============================
-# DELETE FILE
+# DELETE FILE (FIXED)
 # =============================
 @app.delete("/delete/{filename}")
 def delete_file(filename: str):
@@ -270,8 +268,11 @@ def delete_file(filename: str):
         os.remove(file_path)
 
     try:
-        collection.delete(where={"filename": filename})
+        # 🔥 FIXED KEY
+        collection.delete(where={"source": filename})
     except Exception as e:
         print("Vector delete error:", e)
 
     return {"message": f"{filename} deleted"}
+
+

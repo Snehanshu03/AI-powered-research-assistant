@@ -1,51 +1,71 @@
 from chromadb import PersistentClient
 
-# Create persistent client
+# =============================
+# INIT CHROMA
+# =============================
 client = PersistentClient(path="./chroma_db")
 
 collection = client.get_or_create_collection(
     name="research_papers"
 )
 
-
+# =============================
+# STORE EMBEDDINGS
+# =============================
 def store_embeddings(chunks, embeddings, filename):
-    existing = collection.get(where={"filename": filename}, include=[])
-    existing_ids = existing.get("ids", [])
-
-    if existing_ids:
-        collection.delete(where={"filename": filename})
-
-    collection.add(
-        embeddings=[e.tolist() for e in embeddings],
-        documents=[c["text"] for c in chunks],
-        metadatas=[
-            {
-                "filename": filename,   # ✅ FIXED
-                "page": c["page"]
-            }
-            for c in chunks
-        ],
-        ids=[f"{filename}:{i}" for i in range(len(chunks))]
-    )
-
-
-def has_embeddings_for_file(filename):
-    data = collection.get(where={"filename": filename}, include=[])
-    return len(data.get("ids", [])) > 0
-
-
-def search_similar_chunks(query_embedding, filename=None):
-
     try:
+        # 🔥 Delete existing embeddings for this file
+        existing = collection.get(where={"source": filename}, include=[])
+        existing_ids = existing.get("ids", [])
+
+        if existing_ids:
+            collection.delete(where={"source": filename})
+
+        # ✅ HF embeddings are already lists → no .tolist()
+        collection.add(
+            embeddings=embeddings,
+            documents=[c["text"] for c in chunks],
+            metadatas=[
+                {
+                    "source": filename,   # ✅ unified key
+                    "page": c["page"]
+                }
+                for c in chunks
+            ],
+            ids=[f"{filename}:{i}" for i in range(len(chunks))]
+        )
+
+    except Exception as e:
+        print("Store error:", e)
+
+
+# =============================
+# CHECK IF FILE INDEXED
+# =============================
+def has_embeddings_for_file(filename):
+    try:
+        data = collection.get(where={"source": filename}, include=[])
+        return len(data.get("ids", [])) > 0
+    except Exception as e:
+        print("Check embeddings error:", e)
+        return False
+
+
+# =============================
+# SEARCH SIMILAR CHUNKS
+# =============================
+def search_similar_chunks(query_embedding, filename=None):
+    try:
+        # ✅ query_embedding is already list (HF API)
         if filename:
             results = collection.query(
-                query_embeddings=[query_embedding.tolist()],
+                query_embeddings=[query_embedding],
                 n_results=5,
-                where={"filename": filename}
+                where={"source": filename}
             )
         else:
             results = collection.query(
-                query_embeddings=[query_embedding.tolist()],
+                query_embeddings=[query_embedding],
                 n_results=5
             )
 
@@ -58,7 +78,7 @@ def search_similar_chunks(query_embedding, filename=None):
             output.append({
                 "text": results["documents"][0][i],
                 "page": results["metadatas"][0][i]["page"],
-                "filename": results["metadatas"][0][i]["filename"]
+                "filename": results["metadatas"][0][i]["source"]  # ✅ mapped back
             })
 
         return output
@@ -68,10 +88,15 @@ def search_similar_chunks(query_embedding, filename=None):
         return []
 
 
-
+# =============================
+# RESET COLLECTION
+# =============================
 def reset_collection():
     global collection
-    client.delete_collection("research_papers")
+    try:
+        client.delete_collection("research_papers")
+    except Exception:
+        pass
 
     collection = client.get_or_create_collection(
         name="research_papers"

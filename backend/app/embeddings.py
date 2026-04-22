@@ -1,12 +1,35 @@
-from sentence_transformers import SentenceTransformer
+import requests
+import os
 
-# Load model once (important)
-model = SentenceTransformer("all-MiniLM-L6-v2")
+HF_TOKEN = os.getenv("HF_TOKEN")
 
+API_URL = "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2"
 
-def generate_embeddings(chunks: list[str]):
-    """
-    Convert list of text chunks into vector embeddings.
-    """
-    embeddings = model.encode(chunks)
+headers = {
+    "Authorization": f"Bearer {HF_TOKEN}"
+}
+
+def generate_embeddings(chunks):
+    embeddings = []
+
+    for chunk in chunks:
+        text = chunk["text"] if isinstance(chunk, dict) else chunk
+
+        response = requests.post(
+            API_URL,
+            headers=headers,
+            json={"inputs": text}
+        )
+
+        if response.status_code != 200:
+            raise Exception(f"HF API Error: {response.text}")
+
+        emb = response.json()
+
+        # flatten (important)
+        if isinstance(emb[0], list):
+            emb = emb[0]
+
+        embeddings.append(emb)
+
     return embeddings
