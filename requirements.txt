@@ -4,4 +4,3 @@ chromadb
 pypdf
 python-multipart
 requests
-networkx==3.4.2
