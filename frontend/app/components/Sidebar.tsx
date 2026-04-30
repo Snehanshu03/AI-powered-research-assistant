@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 export default function Sidebar({
   setSelectedFile,
@@ -13,19 +13,22 @@ export default function Sidebar({
 }) {
   const [papers, setPapers] = useState<string[]>([]);
   const [active, setActive] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const API = process.env.NEXT_PUBLIC_API_URL;
 
   // =============================
-  // FETCH PAPERS (REUSABLE)
+  // FETCH PAPERS (OPTIMIZED)
   // =============================
-  const fetchPapers = async () => {
+  const fetchPapers = useCallback(async () => {
     if (!API) {
-      console.error("API URL not defined");
+      console.error("❌ NEXT_PUBLIC_API_URL is not defined");
       return;
     }
 
     try {
+      setLoading(true);
+
       const res = await fetch(`${API}/papers`);
 
       if (!res.ok) {
@@ -37,15 +40,17 @@ export default function Sidebar({
       setPapers(data.papers || []);
     } catch (err) {
       console.error("Backend not reachable:", err);
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [API]);
 
   // =============================
   // INITIAL LOAD
   // =============================
   useEffect(() => {
     fetchPapers();
-  }, []);
+  }, [fetchPapers]);
 
   // =============================
   // AUTO REFRESH AFTER UPLOAD
@@ -55,7 +60,7 @@ export default function Sidebar({
 
     window.addEventListener("papersUpdated", handleUpdate);
     return () => window.removeEventListener("papersUpdated", handleUpdate);
-  }, []);
+  }, [fetchPapers]);
 
   return (
     <aside className="w-64 bg-[#171c22] flex flex-col border-r border-[#333e48]">
@@ -74,14 +79,20 @@ export default function Sidebar({
           onClick={fetchPapers}
           className="w-full bg-[#26a69a] hover:bg-[#1f8b81] text-white font-medium py-2 px-4 rounded-md transition"
         >
-          Refresh
+          {loading ? "Loading..." : "Refresh"}
         </button>
       </div>
 
       {/* FILE LIST */}
       <div className="flex-1 overflow-y-auto mt-2 px-2 space-y-1">
 
-        {papers.length === 0 && (
+        {loading && (
+          <div className="text-sm text-gray-500 px-3 py-2">
+            Loading papers...
+          </div>
+        )}
+
+        {!loading && papers.length === 0 && (
           <div className="text-sm text-gray-500 px-3 py-2">
             No papers found
           </div>
@@ -113,7 +124,6 @@ export default function Sidebar({
                 e.stopPropagation();
 
                 if (!confirm("Delete this paper?")) return;
-
                 if (!API) return;
 
                 try {
@@ -129,7 +139,7 @@ export default function Sidebar({
 
                   await fetchPapers();
 
-                  // reset UI if active file deleted
+                  // Reset UI if active file deleted
                   if (active === paper) {
                     setSelectedFile("");
                     setPage(1);
@@ -147,7 +157,6 @@ export default function Sidebar({
             </button>
           </div>
         ))}
-
       </div>
     </aside>
   );

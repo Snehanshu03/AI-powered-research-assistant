@@ -23,8 +23,10 @@ export default function PDFViewer({
 
   const viewerRef = useRef<HTMLDivElement>(null);
 
+  const API = process.env.NEXT_PUBLIC_API_URL;
+
   const pdfUrl = selectedFile
-    ? `${process.env.NEXT_PUBLIC_API_URL}/uploaded_papers/${selectedFile}`
+    ? `${API}/uploaded_papers/${selectedFile}`
     : uploadedPdfUrl;
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
@@ -90,17 +92,21 @@ export default function PDFViewer({
   }, [page, highlight]);
 
   // =============================
-  // 📤 UPLOAD PDF
+  // 📤 UPLOAD PDF (FIXED)
   // =============================
   const uploadPDF = async (file: File) => {
     if (file.type !== "application/pdf") return;
+    if (!API) {
+      console.error("API URL not defined");
+      return;
+    }
 
     setLoading(true);
 
     const formData = new FormData();
     formData.append("file", file);
 
-    await fetch("http://localhost:8000/upload", {
+    await fetch(`${API}/upload`, {
       method: "POST",
       body: formData,
     });
@@ -108,7 +114,7 @@ export default function PDFViewer({
     window.dispatchEvent(new Event("papersUpdated"));
 
     setUploadedPdfUrl(
-      `${process.env.NEXT_PUBLIC_API_URL}/uploaded_papers/${file.name}`
+      `${API}/uploaded_papers/${file.name}`
     );
 
     setLoading(false);
@@ -143,7 +149,6 @@ export default function PDFViewer({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-
       {/* HEADER */}
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-xl text-white">PDF Viewer</h2>
@@ -206,7 +211,7 @@ export default function PDFViewer({
                   renderTextLayer
                   renderAnnotationLayer
                   className="shadow-md"
-                  width={700} // optional but improves readability
+                  width={700}
                 />
               </div>
             ))}

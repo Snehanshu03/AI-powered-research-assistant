@@ -17,40 +17,46 @@ export default function Home() {
   const [highlight, setHighlight] = useState("");
   const [summary, setSummary] = useState("");
 
+  const API = process.env.NEXT_PUBLIC_API_URL;
+
   // =============================
-  // 🔥 AUTO SUMMARY FETCH (CLEAN)
+  // 🔥 AUTO SUMMARY FETCH (FIXED)
   // =============================
   useEffect(() => {
-  if (!selectedFile) return;
-
-  let isMounted = true;
-
-  const fetchSummary = async () => {
-    try {
-      const res = await fetch(
-        `http://127.0.0.1:8000/summarize/${encodeURIComponent(selectedFile)}`
-      );
-
-      if (!res.ok) {
-        if (isMounted) setSummary("Failed to load summary");
-        return;
-      }
-
-      const data = await res.json();
-      if (isMounted) setSummary(data.summary);
-
-    } catch (err) {
-      console.error("Summary fetch failed:", err);
-      if (isMounted) setSummary("Error loading summary");
+    if (!selectedFile) return;
+    if (!API) {
+      console.error("API URL not defined");
+      return;
     }
-  };
 
-  fetchSummary();
+    let isMounted = true;
 
-  return () => {
-    isMounted = false;
-  };
-}, [selectedFile]);
+    const fetchSummary = async () => {
+      try {
+        const res = await fetch(
+          `${API}/summarize/${encodeURIComponent(selectedFile)}`
+        );
+
+        if (!res.ok) {
+          if (isMounted) setSummary("Failed to load summary");
+          return;
+        }
+
+        const data = await res.json();
+        if (isMounted) setSummary(data.summary);
+
+      } catch (err) {
+        console.error("Summary fetch failed:", err);
+        if (isMounted) setSummary("Error loading summary");
+      }
+    };
+
+    fetchSummary();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedFile, API]);
 
   return (
     <div className="flex h-screen w-screen bg-[#1e252b] text-white overflow-hidden">

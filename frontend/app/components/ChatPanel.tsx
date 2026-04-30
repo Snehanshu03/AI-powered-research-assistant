@@ -16,7 +16,9 @@ interface Message {
   sources?: Source[];
   suggestions?: string[];
 }
+
 const API = process.env.NEXT_PUBLIC_API_URL;
+
 const createUserMessage = (content: string): Message => ({
   role: "user",
   content,
@@ -58,6 +60,11 @@ export default function ChatPanel({
   // SEND MESSAGE
   // =============================
   const sendMessage = async (customQuery?: string) => {
+    if (!API) {
+      console.error("API URL not defined");
+      return;
+    }
+
     const queryText = customQuery || input;
 
     if (!queryText.trim()) return;
@@ -107,7 +114,8 @@ export default function ChatPanel({
         ]);
       }
 
-      const sourceResponse = await fetch("${API}/ask", {
+      // ✅ FIXED HERE
+      const sourceResponse = await fetch(`${API}/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -168,12 +176,10 @@ export default function ChatPanel({
       {/* 🔥 CHAT VIEW */}
       {activeTab === "chat" ? (
         <>
-          {/* HEADER */}
           <div className="text-xs text-gray-400 mb-2 shrink-0">
             {selectedFile || "No paper selected"}
           </div>
 
-          {/* SEARCH MODE */}
           <div className="flex gap-2 mb-3 text-xs shrink-0">
             <button
               disabled={!selectedFile}
@@ -199,7 +205,6 @@ export default function ChatPanel({
             </button>
           </div>
 
-          {/* MESSAGES */}
           <div className="flex-1 overflow-y-auto space-y-4 pr-1">
             {messages.map((msg, i) => (
               <div
@@ -219,7 +224,6 @@ export default function ChatPanel({
                     {msg.content}
                   </ReactMarkdown>
 
-                  {/* SOURCES */}
                   {msg.sources && (
                     <div className="mt-3 space-y-2">
                       <div className="text-xs text-gray-400">Sources</div>
@@ -244,7 +248,6 @@ export default function ChatPanel({
                     </div>
                   )}
 
-                  {/* SUGGESTIONS */}
                   {msg.suggestions && (
                     <div className="mt-2 space-y-1">
                       {msg.suggestions.map((q, idx) => (
@@ -269,7 +272,6 @@ export default function ChatPanel({
             )}
           </div>
 
-          {/* INPUT */}
           <div className="mt-3 flex gap-2 shrink-0">
             <input
               value={input}
@@ -288,7 +290,6 @@ export default function ChatPanel({
           </div>
         </>
       ) : (
-        /* 🔥 SUMMARY VIEW */
         <div className="flex-1 overflow-y-auto text-sm text-gray-300 whitespace-pre-line p-2">
           {selectedFile
             ? summary || "Loading summary..."
