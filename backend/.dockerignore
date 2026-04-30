@@ -1,0 +1,15 @@
+.env
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+chroma_db/
+uploaded_papers/
+
+.venv/
+venv/
+env/
+
+Dockerfile
+.dockerignore

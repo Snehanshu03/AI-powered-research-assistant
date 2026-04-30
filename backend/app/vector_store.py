@@ -1,9 +1,12 @@
+import os
+
 from chromadb import PersistentClient
 
 # =============================
 # INIT CHROMA
 # =============================
-client = PersistentClient(path="./chroma_db")
+CHROMA_DB_DIR = os.getenv("CHROMA_DB_DIR", "./chroma_db")
+client = PersistentClient(path=CHROMA_DB_DIR)
 
 collection = client.get_or_create_collection(
     name="research_papers"

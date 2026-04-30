@@ -42,7 +42,10 @@ app.add_middleware(
 # FILE STORAGE
 # =============================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPLOAD_DIR = os.path.join(BASE_DIR, "..", "uploaded_papers")
+UPLOAD_DIR = os.getenv(
+    "UPLOAD_DIR",
+    os.path.join(BASE_DIR, "..", "uploaded_papers")
+)
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -58,6 +61,11 @@ app.mount(
 @app.get("/")
 def root():
     return {"message": "AI Research Assistant backend is running 🚀"}
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 
 # =============================

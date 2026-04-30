@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: ai-powered-research-assistant-backend
+    runtime: docker
+    rootDir: backend
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: HF_TOKEN
+        sync: false
