@@ -1,10 +1,19 @@
 from groq import Groq
 import os
 from dotenv import load_dotenv
-import os
 
-load_dotenv()  # 🔥 this loads .env
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))  # 🔥 replace this
+# Load environment variables (for local dev)
+load_dotenv()
+
+# Get API key
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
+if not GROQ_API_KEY:
+    raise ValueError("GROQ_API_KEY is not set")
+
+# Initialize Groq client
+client = Groq(api_key=GROQ_API_KEY)
+
 
 def generate_answer_stream(query, context):
     stream = client.chat.completions.create(
@@ -13,13 +22,12 @@ def generate_answer_stream(query, context):
             {"role": "system", "content": "You are a helpful research assistant."},
             {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {query}"}
         ],
-        stream=True  # 🔥 IMPORTANT
+        stream=True
     )
 
     for chunk in stream:
-        if chunk.choices[0].delta.content:
+        if chunk.choices and chunk.choices[0].delta.content:
             yield chunk.choices[0].delta.content
-
 
 
 def generate_answer(query: str, context: str):
@@ -44,7 +52,7 @@ Answer:
 
     try:
         response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",  # 🔥 fast + good
+            model="llama-3.1-8b-instant",
             messages=[
                 {"role": "user", "content": prompt}
             ],
@@ -55,5 +63,3 @@ Answer:
 
     except Exception as e:
         return f"LLM Error: {str(e)}"
-    
-
