@@ -31,10 +31,13 @@ app = FastAPI(
 # CORS
 # =============================
 
+# Allow both deployed and local origins
 origins = [
-    "https://ai-powered-research-assistant-chi.vercel.app",  # your frontend
-    "http://localhost:3000",  # for local dev
+    "https://ai-powered-research-assistant-chi.vercel.app",
+    "http://localhost:3000",
+    os.getenv("FRONTEND_URL", "").strip() or None,  # From env
 ]
+origins = [o for o in origins if o]  # Remove None values
 
 app.add_middleware(
     CORSMiddleware,
