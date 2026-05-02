@@ -1,36 +1,40 @@
 import os
-
 from chromadb import PersistentClient
 
 # =============================
 # INIT CHROMA
 # =============================
 CHROMA_DB_DIR = os.getenv("CHROMA_DB_DIR", "./chroma_db")
+
 client = PersistentClient(path=CHROMA_DB_DIR)
 
 collection = client.get_or_create_collection(
     name="research_papers"
 )
 
+
 # =============================
 # STORE EMBEDDINGS
 # =============================
 def store_embeddings(chunks, embeddings, filename):
     try:
-        # 🔥 Delete existing embeddings for this file
+        # Ensure embeddings are list (safety)
+        if hasattr(embeddings, "tolist"):
+            embeddings = embeddings.tolist()
+
+        #  Delete existing file embeddings
         existing = collection.get(where={"source": filename}, include=[])
         existing_ids = existing.get("ids", [])
 
         if existing_ids:
             collection.delete(where={"source": filename})
 
-        # ✅ HF embeddings are already lists → no .tolist()
         collection.add(
-            embeddings=embeddings,
+            embeddings=embeddings,  # list
             documents=[c["text"] for c in chunks],
             metadatas=[
                 {
-                    "source": filename,   # ✅ unified key
+                    "source": filename,
                     "page": c["page"]
                 }
                 for c in chunks
@@ -59,7 +63,10 @@ def has_embeddings_for_file(filename):
 # =============================
 def search_similar_chunks(query_embedding, filename=None):
     try:
-        # ✅ query_embedding is already list (HF API)
+        # 🔥 Ensure query embedding is list
+        if hasattr(query_embedding, "tolist"):
+            query_embedding = query_embedding.tolist()
+
         if filename:
             results = collection.query(
                 query_embeddings=[query_embedding],
@@ -81,7 +88,7 @@ def search_similar_chunks(query_embedding, filename=None):
             output.append({
                 "text": results["documents"][0][i],
                 "page": results["metadatas"][0][i]["page"],
-                "filename": results["metadatas"][0][i]["source"]  # ✅ mapped back
+                "filename": results["metadatas"][0][i]["source"]
             })
 
         return output
