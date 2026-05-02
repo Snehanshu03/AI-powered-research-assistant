@@ -30,14 +30,19 @@ app = FastAPI(
 # =============================
 # CORS
 # =============================
+
+origins = [
+    "https://ai-powered-research-assistant-chi.vercel.app",  # your frontend
+    "http://localhost:3000",  # for local dev
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,   # ⚠️ IMPORTANT
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 # =============================
 # FILE STORAGE
 # =============================
