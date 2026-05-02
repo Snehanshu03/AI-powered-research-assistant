@@ -1,35 +1,43 @@
-import requests
-import os
+from sentence_transformers import SentenceTransformer
+import numpy as np
 
-HF_TOKEN = os.getenv("HF_TOKEN")
+# ================================
+# LOAD LIGHTWEIGHT MODEL (ONCE)
+# ================================
+# Smaller model → better for Render free tier
+_model = None
 
-API_URL = "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2"
+def get_model():
+    global _model
+    if _model is None:
+        _model = SentenceTransformer("paraphrase-MiniLM-L3-v2")  # 🔥 lighter than L6
+    return _model
 
-headers = {
-    "Authorization": f"Bearer {HF_TOKEN}"
-}
 
+# ================================
+# GENERATE EMBEDDINGS
+# ================================
 def generate_embeddings(chunks):
-    embeddings = []
+    try:
+        model = get_model()
 
-    for chunk in chunks:
-        text = chunk["text"] if isinstance(chunk, dict) else chunk
+        # Extract text safely
+        texts = [
+            c["text"] if isinstance(c, dict) else str(c)
+            for c in chunks
+        ]
 
-        response = requests.post(
-            API_URL,
-            headers=headers,
-            json={"inputs": text}
+        # Batch encode (memory safe)
+        embeddings = model.encode(
+            texts,
+            batch_size=8,              # 🔥 keeps memory low
+            show_progress_bar=False,
+            convert_to_numpy=True,
+            normalize_embeddings=True  # improves similarity search
         )
 
-        if response.status_code != 200:
-            raise Exception(f"HF API Error: {response.text}")
+        return embeddings
 
-        emb = response.json()
-
-        # flatten (important)
-        if isinstance(emb[0], list):
-            emb = emb[0]
-
-        embeddings.append(emb)
-
-    return embeddings
+    except Exception as e:
+        print("Embedding Error:", e)
+        return np.array([])
