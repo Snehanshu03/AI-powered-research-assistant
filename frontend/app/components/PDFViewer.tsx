@@ -11,10 +11,12 @@ export default function PDFViewer({
   page,
   highlight,
   selectedFile,
+  setSelectedFile,
 }: {
   page: number;
   highlight?: string;
   selectedFile?: string | null;
+  setSelectedFile?: (file: string) => void;
 }) {
   const [uploadedPdfUrl, setUploadedPdfUrl] = useState<string | null>(null);
   const [numPages, setNumPages] = useState<number>(0);
@@ -92,7 +94,7 @@ export default function PDFViewer({
   }, [page, highlight]);
 
   // =============================
-  // 📤 UPLOAD PDF (FIXED)
+  // 📤 UPLOAD PDF (ENHANCED)
   // =============================
   const uploadPDF = async (file: File) => {
     if (file.type !== "application/pdf") return;
@@ -111,11 +113,19 @@ export default function PDFViewer({
       body: formData,
     });
 
+    const fileName = file.name;
+
     window.dispatchEvent(new Event("papersUpdated"));
 
-    setUploadedPdfUrl(
-      `${API}/uploaded_papers/${file.name}`
-    );
+    // ✅ Auto open uploaded PDF
+    if (setSelectedFile) {
+      setSelectedFile(fileName);
+    }
+
+    // ✅ Reset page to 1
+    window.dispatchEvent(new Event("setPage1"));
+
+    setUploadedPdfUrl(`${API}/uploaded_papers/${fileName}`);
 
     setLoading(false);
   };
@@ -155,7 +165,7 @@ export default function PDFViewer({
 
         <div className="flex items-center gap-3">
           <label className="bg-gray-200 px-3 py-1 rounded cursor-pointer text-black text-sm hover:bg-gray-300">
-            Choose File
+            {loading ? "Uploading..." : "Choose File"}
             <input
               type="file"
               accept="application/pdf"
@@ -190,15 +200,25 @@ export default function PDFViewer({
           </div>
         )}
 
+        {/* 🔥 SKELETON LOADER */}
         {loading && (
-          <div className="text-black">Uploading PDF...</div>
+          <div className="space-y-4 animate-pulse">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-[500px] bg-gray-200 rounded-lg shadow-sm"
+              />
+            ))}
+          </div>
         )}
 
+        {/* 📄 PDF DOCUMENT */}
         {!loading && pdfUrl && (
           <Document
             file={pdfUrl}
             options={pdfOptions}
             onLoadSuccess={onDocumentLoadSuccess}
+            className="animate-fadeIn"
           >
             {Array.from({ length: numPages }, (_, index) => (
               <div
@@ -218,9 +238,12 @@ export default function PDFViewer({
           </Document>
         )}
 
+        {/* 📭 EMPTY STATE */}
         {!loading && !pdfUrl && (
-          <div className="flex items-center justify-center h-full text-black">
-            Upload or select a PDF to begin
+          <div className="flex flex-col items-center justify-center h-full text-gray-500">
+            <div className="text-5xl mb-4">📄</div>
+            <p className="text-lg">Upload or select a PDF</p>
+            <p className="text-sm opacity-70">Drag & drop supported</p>
           </div>
         )}
       </div>

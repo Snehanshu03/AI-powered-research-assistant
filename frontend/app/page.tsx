@@ -75,6 +75,7 @@ export default function Home() {
             page={page}
             highlight={highlight}
             selectedFile={selectedFile}
+            setSelectedFile={setSelectedFile}
           />
         </div>
       </main>
