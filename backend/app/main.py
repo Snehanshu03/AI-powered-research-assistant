@@ -1,12 +1,14 @@
+from fileinput import filename
+
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-
+import threading
 import shutil
 import os
-
+import gc
 from app.pdf_parser import extract_text_with_pages
 from app.chunker import chunk_text
 from app.embeddings import generate_embeddings
@@ -100,28 +102,80 @@ def ensure_file_indexed(filename: str | None):
         return
 
     embeddings = generate_embeddings(chunks)
+
+    if len(embeddings) == 0:
+        return
+
     store_embeddings(chunks, embeddings, filename)
 
+    # 🔥 MEMORY CLEANUP
+    del pages
+    del chunks
+    del embeddings
 
+    gc.collect()
+
+# =============================
+# BACKGROUND PDF PROCESSING
+# =============================
+def process_pdf_background(file_path: str, filename: str):
+    try:
+        pages = extract_text_with_pages(file_path)
+        chunks = chunk_text(pages)
+
+        if not chunks:
+            return
+
+        embeddings = generate_embeddings(chunks)
+
+        if len(embeddings) == 0:
+            return
+
+        store_embeddings(chunks, embeddings, filename)
+
+        # 🔥 MEMORY CLEANUP
+        del pages
+        del chunks
+        del embeddings
+
+        gc.collect()
+
+        print(f"Finished processing: {filename}")
+
+    except Exception as e:
+        print("Background processing error:", e)
+
+# =============================
+# UPLOAD
+# =============================
 # =============================
 # UPLOAD
 # =============================
 @app.post("/upload")
 def upload_pdf(file: UploadFile = File(...)):
 
-    file_path = os.path.join(UPLOAD_DIR, file.filename)
+    try:
+        file_path = os.path.join(UPLOAD_DIR, file.filename)
 
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        # Save file immediately
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
-    pages = extract_text_with_pages(file_path)
-    chunks = chunk_text(pages)
-    embeddings = generate_embeddings(chunks)
+        # 🔥 Process in background
+        threading.Thread(
+            target=process_pdf_background,
+            args=(file_path, file.filename),
+            daemon=True
+        ).start()
 
-    store_embeddings(chunks, embeddings, file.filename)
+        return {
+            "message": "PDF uploaded successfully",
+            "filename": file.filename
+        }
 
-    return {"message": "PDF processed successfully"}
-
+    except Exception as e:
+        print("Upload error:", e)
+        return {"message": "Upload failed"}
 
 # =============================
 # REQUEST MODEL

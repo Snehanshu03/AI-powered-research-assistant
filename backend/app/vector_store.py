@@ -70,13 +70,13 @@ def search_similar_chunks(query_embedding, filename=None):
         if filename:
             results = collection.query(
                 query_embeddings=[query_embedding],
-                n_results=5,
+                n_results=3,
                 where={"source": filename}
             )
         else:
             results = collection.query(
                 query_embeddings=[query_embedding],
-                n_results=5
+                n_results=3
             )
 
         output = []
