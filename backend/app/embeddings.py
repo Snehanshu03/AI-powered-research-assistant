@@ -3,14 +3,10 @@ import os
 import requests
 import gc
 
-# =============================
-# HF API CONFIG
-# =============================
 HF_TOKEN = os.getenv("HF_TOKEN")
 
 API_URL = (
-    "https://api-inference.huggingface.co/"
-    "pipeline/feature-extraction/"
+    "https://api-inference.huggingface.co/models/"
     "sentence-transformers/all-MiniLM-L6-v2"
 )
 
@@ -35,15 +31,19 @@ def generate_embeddings(chunks):
                 else str(chunk)
             )
 
-            # Skip empty text
             if not text.strip():
                 continue
 
             response = requests.post(
                 API_URL,
                 headers=headers,
-                json={"inputs": text},
-                timeout=30
+                json={
+                    "inputs": text,
+                    "options": {
+                        "wait_for_model": True
+                    }
+                },
+                timeout=60
             )
 
             if response.status_code != 200:
@@ -52,15 +52,13 @@ def generate_embeddings(chunks):
 
             result = response.json()
 
-            # Handle nested embeddings
+            # flatten embedding
             if isinstance(result, list) and len(result) > 0:
-
                 if isinstance(result[0], list):
                     result = result[0]
 
                 embeddings.append(result)
 
-        # 🔥 MEMORY CLEANUP
         gc.collect()
 
         return embeddings
@@ -69,3 +67,4 @@ def generate_embeddings(chunks):
         print("Embedding Error:", e)
         gc.collect()
         return []
+
