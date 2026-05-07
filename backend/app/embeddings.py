@@ -1,70 +1,41 @@
-
-import os
-import requests
+from sentence_transformers import SentenceTransformer
 import gc
 
-HF_TOKEN = os.getenv("HF_TOKEN")
-
-API_URL = (
-    "https://api-inference.huggingface.co/models/"
-    "sentence-transformers/all-MiniLM-L6-v2"
-)
-
-headers = {
-    "Authorization": f"Bearer {HF_TOKEN}"
-}
+_model = None
 
 
-# =============================
-# GENERATE EMBEDDINGS
-# =============================
+def get_model():
+    global _model
+
+    if _model is None:
+        _model = SentenceTransformer(
+            "sentence-transformers/paraphrase-MiniLM-L3-v2"
+        )
+
+    return _model
+
+
 def generate_embeddings(chunks):
-
-    embeddings = []
-
     try:
-        for chunk in chunks:
+        model = get_model()
 
-            text = (
-                chunk["text"]
-                if isinstance(chunk, dict)
-                else str(chunk)
-            )
+        texts = [
+            c["text"] if isinstance(c, dict) else str(c)
+            for c in chunks
+        ]
 
-            if not text.strip():
-                continue
-
-            response = requests.post(
-                API_URL,
-                headers=headers,
-                json={
-                    "inputs": text,
-                    "options": {
-                        "wait_for_model": True
-                    }
-                },
-                timeout=60
-            )
-
-            if response.status_code != 200:
-                print("HF API Error:", response.text)
-                continue
-
-            result = response.json()
-
-            # flatten embedding
-            if isinstance(result, list) and len(result) > 0:
-                if isinstance(result[0], list):
-                    result = result[0]
-
-                embeddings.append(result)
+        embeddings = model.encode(
+            texts,
+            batch_size=4,   # lower RAM
+            show_progress_bar=False,
+            convert_to_numpy=True,
+            normalize_embeddings=True
+        )
 
         gc.collect()
 
-        return embeddings
+        return embeddings.tolist()
 
     except Exception as e:
         print("Embedding Error:", e)
-        gc.collect()
         return []
-
