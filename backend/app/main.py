@@ -198,7 +198,16 @@ def ask_stream(request: AskRequest):
 
     ensure_file_indexed(filename)
 
-    query_embedding = generate_embeddings([query])[0]
+    query_embeddings = generate_embeddings([query])
+
+    if not query_embeddings:
+        return {
+            "answer": "Failed to generate embeddings. Please try again.",
+            "sources": [],
+            "suggestions": []
+        }
+
+    query_embedding = query_embeddings[0]
     results = search_similar_chunks(query_embedding, filename)
 
     context = "\n\n".join([r["text"] for r in results]) if results else ""
@@ -235,7 +244,16 @@ def ask(request: AskRequest):
 
     ensure_file_indexed(filename)
 
-    query_embedding = generate_embeddings([query])[0]
+    query_embeddings = generate_embeddings([query])
+
+    if not query_embeddings:
+        return {
+            "answer": "Failed to generate embeddings. Please try again.",
+            "sources": [],
+            "suggestions": []
+        }
+
+    query_embedding = query_embeddings[0]
     results = search_similar_chunks(query_embedding, filename)
 
     context = "\n\n".join([r["text"] for r in results]) if results else ""
