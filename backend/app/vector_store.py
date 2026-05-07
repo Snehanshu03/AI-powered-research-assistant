@@ -1,6 +1,7 @@
 import os
 from chromadb import PersistentClient
 
+os.environ["ANONYMIZED_TELEMETRY"] = "False"
 # =============================
 # INIT CHROMA
 # =============================
