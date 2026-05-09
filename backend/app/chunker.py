@@ -9,7 +9,7 @@
     Returns:
         List[str]: List of text chunks
     """
-def chunk_text(pages, chunk_size=500, overlap=100):
+def chunk_text(pages, chunk_size=1200, overlap=150):
     chunks = []
 
     for page_data in pages:

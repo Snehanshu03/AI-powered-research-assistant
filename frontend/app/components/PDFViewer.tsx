@@ -184,7 +184,10 @@ export default function PDFViewer({
           </span>
         </div>
       </div>
-
+      {/* ⚠️ MEMORY OPTIMIZATION NOTICE */}
+      <p className="text-xs text-amber-400 mb-3">
+        PDFs over 80 pages may be automatically optimized for cloud memory limits.
+      </p>
       {/* VIEWER */}
       <div
         ref={viewerRef}
